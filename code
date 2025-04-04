@@ -1,0 +1,186 @@
+import datetime
+import random
+import json
+import os
+import tkinter as tk
+from tkinter import ttk, messagebox
+from tkcalendar import Calendar
+
+class ModernBirthdayApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Modern Birthday Tracker 🎂")
+        self.root.geometry("800x600")
+        
+        # Configure style
+        self.style = ttk.Style()
+        self.style.configure('Title.TLabel', font=('Helvetica', 16, 'bold'))
+        self.style.configure('Info.TLabel', font=('Helvetica', 11))
+        
+        # Data
+        self.affirmations = [
+            "You're making incredible progress! 🌟",
+            "Your potential is limitless! ✨",
+            "You make the world better! 🌈",
+            "You're unstoppable! 💫",
+            "Your future is bright! ⭐"
+        ]
+        
+        self.tasks = [
+            "Read for 30 minutes 📚",
+            "Practice meditation 🧘‍♂️",
+            "Write in your journal 📝",
+            "Learn a new skill 🎯",
+            "Exercise for 20 minutes 🏃‍♂️"
+        ]
+        
+        self.create_widgets()
+        
+    def create_widgets(self):
+        # Main container
+        container = ttk.Frame(self.root, padding="20")
+        container.grid(row=0, column=0, sticky="nsew")
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
+        
+        # Left panel
+        left_panel = ttk.Frame(container)
+        left_panel.grid(row=0, column=0, padx=(0, 20), sticky="nsew")
+        
+        ttk.Label(left_panel, text="Select Birthday", style='Title.TLabel').pack(pady=(0, 10))
+        
+        # Calendar
+        self.cal = Calendar(left_panel, selectmode='day', date_pattern='dd/mm/yyyy',
+                          background='white', foreground='black',
+                          selectbackground='#2196F3', selectforeground='white')
+        self.cal.pack(pady=(0, 20))
+        
+        # Calculate button
+        calc_btn = ttk.Button(left_panel, text="Calculate Days", command=self.calculate_days,
+                            style='Accent.TButton')
+        calc_btn.pack(pady=(0, 20))
+        
+        # Right panel
+        right_panel = ttk.Frame(container)
+        right_panel.grid(row=0, column=1, sticky="nsew")
+        
+        # Results frame
+        results_frame = ttk.LabelFrame(right_panel, text="Your Information", padding="10")
+        results_frame.pack(fill="x", pady=(0, 20))
+        
+        self.days_var = tk.StringVar()
+        self.affirmation_var = tk.StringVar()
+        self.task_var = tk.StringVar()
+        
+        ttk.Label(results_frame, textvariable=self.days_var, style='Info.TLabel').pack(pady=5)
+        ttk.Label(results_frame, textvariable=self.affirmation_var, style='Info.TLabel').pack(pady=5)
+        ttk.Label(results_frame, textvariable=self.task_var, style='Info.TLabel').pack(pady=5)
+        
+        # Friends frame
+        friends_frame = ttk.LabelFrame(right_panel, text="Friends Birthdays", padding="10")
+        friends_frame.pack(fill="both", expand=True)
+        
+        btn_frame = ttk.Frame(friends_frame)
+        btn_frame.pack(fill="x", pady=10)
+        
+        ttk.Button(btn_frame, text="Add Friend", command=self.show_add_friend).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="View All", command=self.view_friends).pack(side="left")
+        
+        # Configure grid weights
+        container.columnconfigure(1, weight=1)
+        
+    def calculate_days(self):
+        try:
+            selected_date = datetime.datetime.strptime(self.cal.get_date(), "%d/%m/%Y").date()
+            days_left = self.days_until_birthday(selected_date)
+            
+            self.days_var.set(f"⏳ Days until birthday: {days_left}")
+            self.affirmation_var.set(f"🌟 {random.choice(self.affirmations)}")
+            self.task_var.set(f"📋 Today's Task: {random.choice(self.tasks)}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+    
+    def days_until_birthday(self, birthday):
+        today = datetime.date.today()
+        next_birthday = datetime.date(today.year, birthday.month, birthday.day)
+        if next_birthday < today:
+            next_birthday = datetime.date(today.year + 1, birthday.month, birthday.day)
+        return (next_birthday - today).days
+    
+    def show_add_friend(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Add Friend's Birthday")
+        dialog.geometry("400x450")
+        dialog.transient(self.root)
+        
+        ttk.Label(dialog, text="Add New Friend", style='Title.TLabel').pack(pady=10)
+        
+        ttk.Label(dialog, text="Name:").pack(pady=(10, 5))
+        name_entry = ttk.Entry(dialog, width=30)
+        name_entry.pack()
+        
+        ttk.Label(dialog, text="Birthday:").pack(pady=(20, 5))
+        friend_cal = Calendar(dialog, selectmode='day', date_pattern='dd/mm/yyyy')
+        friend_cal.pack(pady=(0, 20))
+        
+        def save():
+            name = name_entry.get().strip()
+            if name:
+                self.save_birthday(name, friend_cal.get_date())
+                dialog.destroy()
+                messagebox.showinfo("Success", f"Birthday saved for {name}!")
+            else:
+                messagebox.showwarning("Warning", "Please enter a name")
+        
+        ttk.Button(dialog, text="Save", command=save).pack(pady=10)
+    
+    def save_birthday(self, name, birthday_str):
+        birthdays = self.load_birthdays()
+        birthdays[name] = birthday_str
+        with open('birthdays.json', 'w', encoding='utf-8') as f:
+            json.dump(birthdays, f, indent=4, ensure_ascii=False)
+    
+    def load_birthdays(self):
+        try:
+            if os.path.exists('birthdays.json'):
+                with open('birthdays.json', 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading birthdays: {e}")
+        return {}
+    
+    def view_friends(self):
+        birthdays = self.load_birthdays()
+        if not birthdays:
+            messagebox.showinfo("No Birthdays", "No birthdays saved yet!")
+            return
+        
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Friends' Birthdays")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        
+        ttk.Label(dialog, text="Birthday List", style='Title.TLabel').pack(pady=10)
+        
+        # Create treeview
+        columns = ('Name', 'Birthday', 'Days Left')
+        tree = ttk.Treeview(dialog, columns=columns, show='headings')
+        
+        for col in columns:
+            tree.heading(col, text=col)
+            tree.column(col, width=150)
+        
+        for name, birthday_str in birthdays.items():
+            birthday = datetime.datetime.strptime(birthday_str, "%d/%m/%Y").date()
+            days = self.days_until_birthday(birthday)
+            tree.insert('', 'end', values=(name, birthday_str, f"{days} days"))
+        
+        tree.pack(pady=10, padx=10, fill='both', expand=True)
+
+def main():
+    root = tk.Tk()
+    app = ModernBirthdayApp(root)
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
